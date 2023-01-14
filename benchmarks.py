@@ -13,7 +13,7 @@ OPEN_ML_TASK_IDS = {
     "fashion-mnist":146825,
     "boston":3736,
     "vehicle_registration":53,
-    "mnist":167216
+    "mnist":3573
 }
 
 # This has been difficult to set up imports for
@@ -21,7 +21,7 @@ def svm_benchmark():
     return SurrogateSVMBenchmark(rng=1), "dataset_fraction", None
 
 def nn_benchmark(task):
-    return NNBenchmark(task_id=OPEN_ML_TASK_IDS["task"], rng=1), "subsample", {"batch_size":64, "depth":3, "width":128}
+    return NNBenchmark(task_id=OPEN_ML_TASK_IDS[task], rng=1), "subsample", {"batch_size":64, "depth":3, "width":128}
 
 def generate_benchmark_bounds(benchmark: AbstractBenchmark, fidelity_param, fixed_params=None):
     if not fixed_params:
@@ -36,12 +36,13 @@ def generate_benchmark_bounds(benchmark: AbstractBenchmark, fidelity_param, fixe
     bounds.append([fidelity_param.lower, fidelity_param.upper])
     return torch.tensor(bounds, **tkwargs).T
 
-def generate_objective_function(benchmark: AbstractBenchmark, fidelity_param, fixed_params=None):
+def generate_objective_function(benchmark: AbstractBenchmark, fidelity_param, fixed_params=None, **fidelity_kwargs):
     if not fixed_params:
         fixed_params = {}
     param_names = list(benchmark.configuration_space)
     for p in fixed_params.keys():
         param_names.remove(p)
+
 
     config_dict = fixed_params
     def objective_wrapper(x, full_result=False):
@@ -54,7 +55,10 @@ def generate_objective_function(benchmark: AbstractBenchmark, fidelity_param, fi
             for k, v in zip(param_names, row):
                 config_dict[k] = v.item()
 
-            res = benchmark.objective_function(config_dict, {fidelity_param:row[-1].item()})
+            fidelity_dict = {fidelity_param:row[-1].item()}
+            if fidelity_kwargs:
+                fidelity_dict.update(fidelity_kwargs)
+            res = benchmark.objective_function(config_dict, fidelity_dict)
             results.append(res)
             accs.append(res["function_value"])
             costs.append(res["cost"])
