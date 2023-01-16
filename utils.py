@@ -13,13 +13,15 @@ def run_experiment(
     multi_fidelity,
     num_runs=20,
     num_iters=50,
+    initial_samples=10,
 ):
-    """Run a single """
+    """Run a single experiment on multiple benchmarks."""
 
     all_results = []
     for benchmark in benchmarks:
         print(f"Starting {benchmark.__name__}")
         objective_function, bounds = generate_optimization_task(benchmark)
+
         log_transform_indices = getattr(benchmark, "log_transform_indices", None)
         if log_transform_indices:
             old_mf = model_factory
@@ -33,11 +35,10 @@ def run_experiment(
 
         pass_current_best = getattr(acquisition_factory, "pass_current_best", False)
         full_fidelity = not multi_fidelity
+
         if multi_fidelity:
-            initial_samples = 10
             fidelity_samples = [0.1, 0.2, 0.4]
         else:
-            initial_samples = 30
             fidelity_samples = None
 
         for run in range(num_runs):
