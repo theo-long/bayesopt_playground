@@ -3,7 +3,7 @@ from botorch.acquisition.max_value_entropy_search import qMultiFidelityMaxValueE
 from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
 from botorch.acquisition.utils import project_to_target_fidelity
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
-from botorch.acquisition import PosteriorMean, FixedFeatureAcquisitionFunction, qExpectedImprovement
+from botorch.acquisition import PosteriorMean, FixedFeatureAcquisitionFunction, ExpectedImprovement
 from botorch.acquisition.objective import MCAcquisitionObjective
 
 from botorch.optim.initializers import gen_one_shot_kg_initial_conditions
@@ -51,14 +51,14 @@ def optimize_acqf_and_get_observation(acqf, bounds, objective_function, q=1, ver
     )
     # observe new values
     new_x = candidates.detach()
-    new_obj, new_cost = objective_function(new_x)
+    new_obj, new_cost, full_results = objective_function(new_x)
     new_obj = new_obj.unsqueeze(-1)
     new_cost = new_cost.unsqueeze(-1)
 
     if verbose:
         print(f"candidates:\n{new_x}\n")
         print(f"observations:\n{new_obj}\n\n")
-    return new_x, new_obj, new_cost
+    return new_x, new_obj, new_cost, full_results
 
 def multi_fidelity_kg(model, cost_model, bounds):
     cost_aware_utility = InverseCostWeightedUtility(
@@ -112,9 +112,5 @@ def mutli_fidelity_entropy_search(model, cost_model, bounds):
     )
 
 def expected_improvement(model, cost_model, bounds, best_f):
-    return FixedFeatureAcquisitionFunction(
-        acq_function=qExpectedImprovement(model=model, best_f=best_f),
-        d=bounds.shape[-1],
-        columns=[-1],
-        values=[1],
-    )
+    return ExpectedImprovement(model=model, best_f=best_f)
+expected_improvement.pass_current_best = True
