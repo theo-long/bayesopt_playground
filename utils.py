@@ -63,8 +63,8 @@ def run_experiment(
             full_results += results
             evaluations_df = pd.concat(
                 [
-                    pd.DataFrame(train_x.detach().numpy()),
-                    pd.DataFrame(final_rec.detach().numpy()),
+                    pd.DataFrame(train_x.detach().cpu().numpy()),
+                    pd.DataFrame(final_rec.detach().cpu().numpy()),
                 ]
             ).reset_index(drop=True)
             results_df = pd.DataFrame(full_results)
