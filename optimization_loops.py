@@ -91,10 +91,9 @@ def optimization_loop(
         q=q,
         log_transform_indices=log_transform_indices,
     )
-    print(train_x.shape, train_obj.shape)
-    if getattr(objective_function, "synthetic", False):
-        train_obj = train_obj.unsqueeze(-1)
-        train_cost = train_cost.unsqueeze(-1)
+
+    train_obj = train_obj.unsqueeze(-1)
+    train_cost = train_cost.unsqueeze(-1)
 
     train_x = train_x.squeeze(1)
 
@@ -103,7 +102,6 @@ def optimization_loop(
 
     with gpt_settings.cholesky_max_tries(6):
         # Initialize objective model
-        print(train_x.shape, train_obj.shape)
         mll, model = model_factory(train_x, train_obj, bounds)
         optimize_hyperparameters(mll)
 
