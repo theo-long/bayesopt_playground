@@ -74,6 +74,10 @@ def run_experiment(
             # results_df = pd.concat([results_df, evaluations_df], axis=1)
             all_results.append(results_df)
 
+        # Save after every benchmark in case of partial run
+        all_results_df = pd.concat(all_results)
+        all_results_df.to_csv(f"./data/{experiment_name}.csv")
+
     all_results_df = pd.concat(all_results)
     all_results_df.to_csv(f"./data/{experiment_name}.csv")
 
