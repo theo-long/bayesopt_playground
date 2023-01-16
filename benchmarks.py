@@ -38,10 +38,12 @@ def nn_benchmark(task):
     )
 
 
-nn_mnist_benchmark = lambda: nn_benchmark("mnist")
+def nn_mnist_benchmark():
+    return nn_benchmark("mnist")
 nn_mnist_benchmark.log_transform_indices = [0, 1]
 
-nn_fashion_mnist_benchmark = lambda: nn_benchmark("fashion-mnist")
+def nn_fashion_mnist_benchmark():
+    return nn_benchmark("fashion-mnist")
 nn_fashion_mnist_benchmark.log_transform_indices = [0, 1]
 
 
