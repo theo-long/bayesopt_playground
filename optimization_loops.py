@@ -1,9 +1,11 @@
 from botorch.utils import sampling
 from botorch import fit_gpytorch_mll
+from botorch.optim.fit import fit_gpytorch_mll_torch
 from botorch.optim import optimize_acqf
 from botorch.acquisition import FixedFeatureAcquisitionFunction, PosteriorMean
 from botorch.exceptions import ModelFittingError
 from botorch.models.transforms.input import Log10
+from botorch.models.cost import AffineFidelityCostModel
 
 import gpytorch.settings as gpt_settings
 
@@ -16,6 +18,16 @@ from .acquistion_functions import (
     RAW_SAMPLES,
 )
 
+def optimize_hyperparameters(mll, optimizer=None, raise_error=True):
+    '''Optimize hyperparameters of our BoTorch model.'''
+    optimizer = optimizer if optimizer else fit_gpytorch_mll_torch
+    try:
+        fit_gpytorch_mll(mll, optimizer=fit_gpytorch_mll_torch)
+    except ModelFittingError as e:
+        if raise_error:
+            raise(e)
+        print("ERROR FITTING MODEL")
+
 
 def generate_initial_data(
     objective_function,
@@ -26,6 +38,8 @@ def generate_initial_data(
     log_transform_indices=None,
 ):
     """generate inital training data before optimization starts."""
+    if fidelity_samples:
+        bounds = bounds[:, :-1]
 
     if log_transform_indices:
         transformed_bounds = Log10(log_transform_indices)(bounds)
@@ -33,13 +47,13 @@ def generate_initial_data(
         train_x = Log10(log_transform_indices).untransform(train_x)
     else:
         train_x = sampling.draw_sobol_samples(bounds, n=n, q=q)
-
+    
     if fidelity_samples:
         train_x = train_x.repeat(len(fidelity_samples), 1, 1)
         ext_samples = torch.tensor(fidelity_samples)[:, None, None].repeat(n, 1, 1)
         train_x = torch.cat([train_x, ext_samples], dim=-1)
-
-    train_obj, train_cost, full_results = objective_function(train_x)
+    
+    train_obj, train_cost, full_results = objective_function(train_x.squeeze(1))
     return train_x, train_obj, train_cost, full_results
 
 
@@ -77,8 +91,8 @@ def optimization_loop(
         q=q,
         log_transform_indices=log_transform_indices,
     )
-
-    if objective_function.synthetic:
+    print(train_x.shape, train_obj.shape)
+    if getattr(objective_function, "synthetic", False):
         train_obj = train_obj.unsqueeze(-1)
         train_cost = train_cost.unsqueeze(-1)
 
@@ -89,12 +103,16 @@ def optimization_loop(
 
     with gpt_settings.cholesky_max_tries(6):
         # Initialize objective model
+        print(train_x.shape, train_obj.shape)
         mll, model = model_factory(train_x, train_obj, bounds)
-        fit_gpytorch_mll(mll)
+        optimize_hyperparameters(mll)
 
         # Initialize cost model
-        cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds)
-        fit_gpytorch_mll(cost_mll)
+        if isinstance(cost_model_factory, AffineFidelityCostModel):
+            cost_model = cost_model_factory
+        else:
+            cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds)
+            optimize_hyperparameters(cost_mll)
 
         for _ in trange(n_iter):
             # Fetch new evaluation points
@@ -122,19 +140,19 @@ def optimization_loop(
             results += full_results
 
             # Fit models with new data
-            try:
-                mll, model = model_factory(train_x, train_obj, bounds)
-                fit_gpytorch_mll(mll)
+            mll, model = model_factory(train_x, train_obj, bounds)
+            optimize_hyperparameters(mll)
+            if isinstance(cost_model_factory, AffineFidelityCostModel):
+                cost_model = cost_model_factory
+            else:
                 cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds)
-                fit_gpytorch_mll(cost_mll)
-            except ModelFittingError:
-                print("ERROR FITTING MODEL")
-                return model, train_x, train_obj, full_results
-
-    return model, train_x, train_obj, full_results
+                optimize_hyperparameters(cost_mll)
 
 
-def get_recommendation(model, objective_function, bounds, full_fidelity=False):
+    return model, train_x, train_obj, results
+
+
+def get_recommendation(model, objective_function, bounds, full_fidelity=False, verbose=False):
     """Generate a recommended hyperparameter setting from a trained model."""
     if full_fidelity:
         rec_acqf = PosteriorMean(model)
@@ -145,21 +163,25 @@ def get_recommendation(model, objective_function, bounds, full_fidelity=False):
             columns=[-1],
             values=[1],
         )
+        bounds=bounds[:, :-1]
 
-    final_rec, _ = optimize_acqf(
-        acq_function=rec_acqf,
-        bounds=bounds[:, :-1],
-        q=1,
-        num_restarts=NUM_RESTARTS,
-        raw_samples=RAW_SAMPLES,
-        options={"batch_limit": 5, "maxiter": 200},
-    )
+    with gpt_settings.cholesky_max_tries(6):
+        final_rec, _ = optimize_acqf(
+            acq_function=rec_acqf,
+            bounds=bounds,
+            q=1,
+            num_restarts=NUM_RESTARTS,
+            raw_samples=RAW_SAMPLES,
+            options={"batch_limit": 5, "maxiter": 200},
+        )
 
-    final_rec = rec_acqf._construct_X_full(final_rec)
+    if not full_fidelity:
+        final_rec = rec_acqf._construct_X_full(final_rec)
 
-    objective_value, objective_cost = objective_function(final_rec, full_fidelity)
-    print(f"recommended point:\n{final_rec}\n\nobjective value:\n{objective_value}")
-    return final_rec
+    objective_value, objective_cost, full_results = objective_function(final_rec, project_to_max_fidelity=full_fidelity)
+    if verbose:
+        print(f"recommended point:\n{final_rec}\n\nobjective value:\n{objective_value}")
+    return final_rec, objective_value, full_results
 
 
 if __name__ == "__main__":
