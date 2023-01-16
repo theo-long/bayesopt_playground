@@ -2,6 +2,7 @@ from .optimization_loops import optimization_loop, get_recommendation
 from .benchmarks import generate_optimization_task
 
 import pandas as pd
+import os
 
 
 def run_experiment(
@@ -16,7 +17,9 @@ def run_experiment(
     initial_samples=10,
 ):
     """Run a single experiment on multiple benchmarks."""
-
+    if not os.path.exists('./data'):
+        os.mkdir('./data')
+        
     all_results = []
     for benchmark in benchmarks:
         print(f"Starting {benchmark.__name__}")
