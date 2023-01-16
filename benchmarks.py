@@ -161,8 +161,8 @@ def generate_optimization_task(benchmark):
                 [
                     {"function_value": v, "cost": c}
                     for v, c in zip(
-                        value.detach().flatten().numpy(),
-                        cost.detach().flatten().numpy(),
+                        value.detach().flatten().cpu().numpy(),
+                        cost.detach().flatten().cpu().numpy(),
                     )
                 ],
             )
