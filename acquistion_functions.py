@@ -45,6 +45,14 @@ def optimize_acqf_and_get_observation(
 ):
     """Optimizes acquisition_function and returns a new candidate, observation, and cost."""
 
+    fidelity_lower = bounds[0, -1].item()
+    fidelity_upper = bounds[1, -1].item()
+
+    if fidelity_upper != 1.0:
+        fixed_features_list = [{-1:i} for i in range(int(fidelity_lower), int(fidelity_upper) + 1)]
+    else:
+        fixed_features_list = None
+    
     if isinstance(acqf, qMultiFidelityKnowledgeGradient):
         X_init = gen_one_shot_kg_initial_conditions(
             acq_function=acqf,
@@ -52,12 +60,11 @@ def optimize_acqf_and_get_observation(
             q=q,
             num_restarts=NUM_RESTARTS,
             raw_samples=RAW_SAMPLES,
+            fixed_features=fixed_features_list[-1]
         )
     else:
         X_init = None
 
-    fidelity_lower = bounds[0, -1].item()
-    fidelity_upper = bounds[1, -1].item()
     if fidelity_upper != 1.0:
         candidates, _ = optimize_acqf_mixed(
             acq_function=acqf,
@@ -67,7 +74,7 @@ def optimize_acqf_and_get_observation(
             raw_samples=RAW_SAMPLES,
             batch_initial_conditions=X_init,
             options={"batch_limit": 5, "maxiter": 500},
-            fixed_features_list=[{-1:i} for i in range(int(fidelity_lower), int(fidelity_upper) + 1)]
+            fixed_features_list=fixed_features_list
         )
     else:
         candidates, _ = optimize_acqf(
