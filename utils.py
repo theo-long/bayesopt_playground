@@ -33,16 +33,24 @@ def run_experiment(
 
         log_transform_indices = getattr(benchmark, "log_transform_indices", None)
         if log_transform_indices:
-            model_factory = partial(model_factory, log_transform_indices=log_transform_indices)
+            model_factory = partial(
+                model_factory, log_transform_indices=log_transform_indices
+            )
 
             if not isinstance(cost_model_factory, AffineFidelityCostModel):
-                cost_model_factory = partial(cost_model_factory, log_transform_indices=log_transform_indices)
+                cost_model_factory = partial(
+                    cost_model_factory, log_transform_indices=log_transform_indices
+                )
 
         pass_current_best = getattr(acquisition_factory, "pass_current_best", False)
         full_fidelity = not multi_fidelity
 
         if multi_fidelity:
-            fidelity_samples = [0.1, 0.2, 0.4]
+            fidelity_samples = [
+                0.1 * bounds[-1, 1].item(),
+                0.2 * bounds[-1, 1].item(),
+                0.4 * bounds[-1, 1].item(),
+            ]
         else:
             fidelity_samples = None
 
@@ -72,7 +80,7 @@ def run_experiment(
             iterable = args_iterable()
             for args in iterable:
                 results.append(single_run(*args))
-        
+
         all_results += results
 
         # Save after every benchmark in case of partial run
