@@ -39,7 +39,9 @@ def generate_initial_data(
 ):
     """generate inital training data before optimization starts."""
     if fidelity_samples:
+        fidelity_dtype = torch.int32 if bounds[1, -1].item() > 1.0 else torch.float32
         bounds = bounds[:, :-1]
+        
 
     if log_transform_indices:
         transformed_bounds = Log10(log_transform_indices)(bounds)
@@ -50,7 +52,7 @@ def generate_initial_data(
     
     if fidelity_samples:
         train_x = train_x.repeat(len(fidelity_samples), 1, 1)
-        ext_samples = torch.tensor(fidelity_samples)[:, None, None].repeat(n, 1, 1)
+        ext_samples = torch.tensor(fidelity_samples, dtype=fidelity_dtype)[:, None, None].repeat(n, 1, 1)
         train_x = torch.cat([train_x, ext_samples], dim=-1)
     
     train_obj, train_cost, full_results = objective_function(train_x.squeeze(1))
