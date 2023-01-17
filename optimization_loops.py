@@ -161,7 +161,7 @@ def get_recommendation(model, objective_function, bounds, full_fidelity=False, v
             acq_function=PosteriorMean(model),
             d=bounds.shape[-1],
             columns=[-1],
-            values=[1],
+            values=[bounds[1, -1].item()],
         )
         bounds=bounds[:, :-1]
 
