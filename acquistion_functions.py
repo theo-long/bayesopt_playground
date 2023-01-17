@@ -155,7 +155,7 @@ def mutli_fidelity_entropy_search(model, cost_model, bounds):
     )
 
 
-def predicted_entropy_search(model, cost_model, bounds):
+def predictive_entropy_search(model, cost_model, bounds):
     num_samples = 10
     num_points = 1
 
