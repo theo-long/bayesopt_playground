@@ -14,7 +14,7 @@ from typing import Optional, Dict, Tuple, List, Any
 from botorch.exceptions import UnsupportedError
 
 
-def multi_fidelity_gp(train_x, train_obj, bounds, kernel, linear_truncated, log_transform_indices=None):
+def multi_fidelity_gp(train_x, train_obj, bounds, kernel=MaternKernel, linear_truncated=False, log_transform_indices=None):
     # define a surrogate model suited for a "training data"-like fidelity parameter
     if not log_transform_indices:
         input_transform = Normalize(d=train_x.shape[-1], bounds=bounds)
