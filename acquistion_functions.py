@@ -53,7 +53,7 @@ def optimize_acqf_and_get_observation(
     else:
         fixed_features_list = None
     
-    if isinstance(acqf, qMultiFidelityKnowledgeGradient):
+    if isinstance(acqf, qMultiFidelityKnowledgeGradient) and fidelity_upper != 1.0:
         X_init = gen_one_shot_kg_initial_conditions(
             acq_function=acqf,
             bounds=bounds,
