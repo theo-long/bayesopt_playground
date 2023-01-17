@@ -72,6 +72,7 @@ def optimization_loop(
     log_transform_indices=None,
     pass_current_best=False,
     full_fidelity=False,
+    optimizer=None,
 ):
     # For doing non-multi-fidelity optimization
     if full_fidelity:
@@ -104,18 +105,21 @@ def optimization_loop(
 
     with gpt_settings.cholesky_max_tries(6):
         # Initialize objective model
+        print("fit m ")
         mll, model = model_factory(train_x, train_obj, bounds, log_transform_indices=log_transform_indices)
-        optimize_hyperparameters(mll)
+        optimize_hyperparameters(mll, optimizer=optimizer)
 
         # Initialize cost model
         if isinstance(cost_model_factory, AffineFidelityCostModel):
             cost_model = cost_model_factory
         else:
+            print("fit c")
             cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds, log_transform_indices=log_transform_indices)
-            optimize_hyperparameters(cost_mll)
+            optimize_hyperparameters(cost_mll, optimizer=optimizer)
 
         for _ in trange(n_iter):
             # Fetch new evaluation points
+            print("gen acq")
             if pass_current_best:
                 current_best = train_obj.max()
                 acquisition_function = acquisition_factory(
@@ -124,6 +128,7 @@ def optimization_loop(
             else:
                 acquisition_function = acquisition_factory(model, cost_model, bounds)
 
+            print("fit acq")
             new_x, new_obj, new_cost, full_results = optimize_acqf_and_get_observation(
                 acquisition_function,
                 bounds,
@@ -139,14 +144,16 @@ def optimization_loop(
             cumulative_cost += new_cost.sum()
             results += full_results
 
+            print("fit m")
             # Fit models with new data
             mll, model = model_factory(train_x, train_obj, bounds, log_transform_indices=log_transform_indices)
-            optimize_hyperparameters(mll)
+            optimize_hyperparameters(mll, optimizer=optimizer)
             if isinstance(cost_model_factory, AffineFidelityCostModel):
                 cost_model = cost_model_factory
             else:
+                print("fit c")
                 cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds, log_transform_indices=log_transform_indices)
-                optimize_hyperparameters(cost_mll)
+                optimize_hyperparameters(cost_mll, optimizer=optimizer)
 
 
     return model, train_x, train_obj, results

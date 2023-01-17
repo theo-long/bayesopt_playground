@@ -21,6 +21,7 @@ def run_experiment(
     num_iters=50,
     initial_samples=5,
     parallelized=True,
+    optimizer=None,
 ):
     """Run a single experiment on multiple benchmarks."""
     if not os.path.exists("./data"):
@@ -73,6 +74,7 @@ def run_experiment(
                     full_fidelity,
                     pass_current_best,
                     benchmark,
+                    optimizer,
                 )
 
         if parallelized:
@@ -108,6 +110,7 @@ def single_run(
     full_fidelity,
     pass_current_best,
     benchmark,
+    optimizer,
 ):
     print(f"Run {run+1}", end="\r")
 
@@ -123,6 +126,7 @@ def single_run(
         log_transform_indices=log_transform_indices,
         full_fidelity=full_fidelity,
         pass_current_best=pass_current_best,
+        optimizer=optimizer,
     )
     final_rec, objective_value, results = get_recommendation(
         model, objective_function, bounds, full_fidelity=full_fidelity
