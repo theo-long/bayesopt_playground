@@ -1,5 +1,11 @@
-from botorch.acquisition.knowledge_gradient import qMultiFidelityKnowledgeGradient, qKnowledgeGradient
-from botorch.acquisition.max_value_entropy_search import qMultiFidelityMaxValueEntropy, qMaxValueEntropy
+from botorch.acquisition.knowledge_gradient import (
+    qMultiFidelityKnowledgeGradient,
+    qKnowledgeGradient,
+)
+from botorch.acquisition.max_value_entropy_search import (
+    qMultiFidelityMaxValueEntropy,
+    qMaxValueEntropy,
+)
 from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
 from botorch.acquisition.utils import project_to_target_fidelity
 from botorch.acquisition.cost_aware import InverseCostWeightedUtility
@@ -9,6 +15,11 @@ from botorch.acquisition import (
     ExpectedImprovement,
 )
 from botorch.acquisition.objective import MCAcquisitionObjective
+from botorch.acquisition.multi_objective.utils import (
+    sample_optimal_points,
+    random_search_optimizer,
+)
+
 
 from botorch.optim.initializers import gen_one_shot_kg_initial_conditions
 from botorch.optim import optimize_acqf, optimize_acqf_mixed
@@ -23,10 +34,9 @@ RAW_SAMPLES = 512 if not SMOKE_TEST else 4
 
 # Need to make this a class for pickle-ability
 class ProjectionOperator:
-
     def __init__(self, target_fidelities=None) -> None:
         self.target_fidelities = target_fidelities
-    
+
     def __call__(self, X):
         return project_to_target_fidelity(X, self.target_fidelities)
 
@@ -49,10 +59,12 @@ def optimize_acqf_and_get_observation(
     fidelity_upper = bounds[1, -1].item()
 
     if fidelity_upper > 1.01:
-        fixed_features_list = [{-1:i} for i in range(int(fidelity_lower), int(fidelity_upper) + 1)]
+        fixed_features_list = [
+            {-1: i} for i in range(int(fidelity_lower), int(fidelity_upper) + 1)
+        ]
     else:
         fixed_features_list = None
-    
+
     if isinstance(acqf, qMultiFidelityKnowledgeGradient) and fidelity_upper <= 1.01:
         X_init = gen_one_shot_kg_initial_conditions(
             acq_function=acqf,
@@ -64,7 +76,6 @@ def optimize_acqf_and_get_observation(
     else:
         X_init = None
 
-    
     candidates, _ = optimize_acqf(
         acq_function=acqf,
         bounds=bounds,
@@ -74,7 +85,7 @@ def optimize_acqf_and_get_observation(
         batch_initial_conditions=X_init,
         options={"batch_limit": 5, "maxiter": 200},
     )
-    
+
     # observe new values
     new_x = candidates.detach()
     new_obj, new_cost, full_results = objective_function(new_x)
@@ -93,7 +104,7 @@ def multi_fidelity_kg(model, cost_model, bounds):
     )
 
     target_fidelity = bounds[1, -1].cpu().item()
-    projection_operator = ProjectionOperator(target_fidelities={-1:target_fidelity})
+    projection_operator = ProjectionOperator(target_fidelities={-1: target_fidelity})
 
     curr_val_acqf = FixedFeatureAcquisitionFunction(
         acq_function=PosteriorMean(model),
@@ -112,7 +123,6 @@ def multi_fidelity_kg(model, cost_model, bounds):
         options={"batch_limit": 10, "maxiter": 200},
     )
 
-    
     return qMultiFidelityKnowledgeGradient(
         model=model,
         num_fantasies=128 if not SMOKE_TEST else 2,
@@ -135,7 +145,7 @@ def mutli_fidelity_entropy_search(model, cost_model, bounds):
     candidate_set = bounds[0] + (bounds[1] - bounds[0]) * candidate_set
 
     target_fidelity = bounds[1, -1].cpu().item()
-    projection_operator = ProjectionOperator(target_fidelities={-1:target_fidelity})
+    projection_operator = ProjectionOperator(target_fidelities={-1: target_fidelity})
     return qMultiFidelityMaxValueEntropy(
         model=model,
         cost_aware_utility=cost_aware_utility,
@@ -143,6 +153,30 @@ def mutli_fidelity_entropy_search(model, cost_model, bounds):
         num_fantasies=128 if not SMOKE_TEST else 2,
         candidate_set=candidate_set,
     )
+
+
+def predicted_entropy_search(model, cost_model, bounds):
+    num_samples = 10
+    num_points = 1
+
+    optimal_inputs, optimal_outputs = sample_optimal_points(
+        model=model,
+        bounds=bounds,
+        num_samples=num_samples,
+        num_points=num_points,
+        optimizer=random_search_optimizer,
+    )
+    return qPredictiveEntropySearch(
+        model=model, optimal_inputs=optimal_inputs.squeeze(-2)
+    )
+
+
+def max_value_entropy_search(model, cost_model, bounds):
+    candidate_set = torch.rand(
+        1000, bounds.size(1), device=bounds.device, dtype=bounds.dtype
+    )
+    candidate_set = bounds[0] + (bounds[1] - bounds[0]) * candidate_set
+    return qMaxValueEntropy(model=model, candidate_set=candidate_set)
 
 
 def expected_improvement(model, cost_model, bounds, best_f):
