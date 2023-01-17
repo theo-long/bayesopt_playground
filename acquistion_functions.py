@@ -98,7 +98,7 @@ def multi_fidelity_kg(model, cost_model, bounds):
 
     curr_val_acqf = FixedFeatureAcquisitionFunction(
         acq_function=PosteriorMean(model),
-        d=bounds.shape(-1),
+        d=bounds.shape[-1],
         columns=[-1],
         values=[1.0],
     )
