@@ -46,7 +46,7 @@ def run_experiment(
         full_fidelity = not multi_fidelity
 
         if multi_fidelity:
-            max_fidelity = bounds[-1, 1]
+            max_fidelity = bounds[1, -1]
             fidelity_samples = [
                 0.1 * max_fidelity,
                 0.2 * max_fidelity,
