@@ -73,7 +73,7 @@ def run_experiment(
                 )
 
         if parallelized:
-            with multiprocessing.Pool(multiprocessing.cpu_count) as pool:
+            with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
                 results = pool.starmap(single_run, args_iterable())
         else:
             results = []
