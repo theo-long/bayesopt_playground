@@ -60,7 +60,6 @@ def optimize_acqf_and_get_observation(
             q=q,
             num_restarts=NUM_RESTARTS,
             raw_samples=RAW_SAMPLES,
-            fixed_features=fixed_features_list[-1]
         )
     else:
         X_init = None
