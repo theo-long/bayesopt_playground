@@ -66,7 +66,7 @@ def optimize_acqf_and_get_observation(
             num_restarts=NUM_RESTARTS,
             raw_samples=RAW_SAMPLES,
             batch_initial_conditions=X_init,
-            options={"batch_limit": 5, "maxiter": 4000},
+            options={"batch_limit": 5, "maxiter": 500},
             fixed_features_list=[{-1:i} for i in range(fidelity_lower, fidelity_upper + 1)]
         )
     else:
