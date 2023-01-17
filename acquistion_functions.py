@@ -48,12 +48,12 @@ def optimize_acqf_and_get_observation(
     fidelity_lower = bounds[0, -1].item()
     fidelity_upper = bounds[1, -1].item()
 
-    if fidelity_upper != 1.0:
+    if fidelity_upper > 1.01:
         fixed_features_list = [{-1:i} for i in range(int(fidelity_lower), int(fidelity_upper) + 1)]
     else:
         fixed_features_list = None
     
-    if isinstance(acqf, qMultiFidelityKnowledgeGradient) and fidelity_upper == 1.0:
+    if isinstance(acqf, qMultiFidelityKnowledgeGradient) and fidelity_upper <= 1.01:
         X_init = gen_one_shot_kg_initial_conditions(
             acq_function=acqf,
             bounds=bounds,
@@ -65,7 +65,7 @@ def optimize_acqf_and_get_observation(
     else:
         X_init = None
 
-    if fidelity_upper != 1.0:
+    if fidelity_upper > 1.01:
         candidates, _ = optimize_acqf_mixed(
             acq_function=acqf,
             bounds=bounds,
