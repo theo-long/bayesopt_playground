@@ -64,27 +64,17 @@ def optimize_acqf_and_get_observation(
     else:
         X_init = None
 
-    if fidelity_upper > 1.01:
-        candidates, _ = optimize_acqf_mixed(
-            acq_function=acqf,
-            bounds=bounds,
-            q=q,
-            num_restarts=NUM_RESTARTS,
-            raw_samples=RAW_SAMPLES,
-            batch_initial_conditions=X_init,
-            options={"batch_limit": 5, "maxiter": 500},
-            fixed_features_list=fixed_features_list
-        )
-    else:
-        candidates, _ = optimize_acqf(
-            acq_function=acqf,
-            bounds=bounds,
-            q=q,
-            num_restarts=NUM_RESTARTS,
-            raw_samples=RAW_SAMPLES,
-            batch_initial_conditions=X_init,
-            options={"batch_limit": 5, "maxiter": 200},
-        )
+    
+    candidates, _ = optimize_acqf(
+        acq_function=acqf,
+        bounds=bounds,
+        q=q,
+        num_restarts=NUM_RESTARTS,
+        raw_samples=RAW_SAMPLES,
+        batch_initial_conditions=X_init,
+        options={"batch_limit": 5, "maxiter": 200},
+    )
+    
     # observe new values
     new_x = candidates.detach()
     new_obj, new_cost, full_results = objective_function(new_x)
