@@ -2,6 +2,13 @@ import torch
 import scipy
 
 from hpobench.benchmarks.surrogates.svm_benchmark import SurrogateSVMBenchmark
+from hpobench.benchmarks.surrogates.paramnet_benchmark import (
+    ParamNetAdultOnTimeBenchmark,
+    ParamNetHiggsOnTimeBenchmark,
+    ParamNetLetterOnTimeBenchmark,
+    ParamNetMnistOnTimeBenchmark,
+    ParamNetOptdigitsOnTimeBenchmark,
+)
 from hpobench.benchmarks.ml import NNBenchmark
 from hpobench.abstract_benchmark import AbstractBenchmark
 
@@ -25,25 +32,54 @@ OPEN_ML_TASK_IDS = {
     "mnist": 3573,
 }
 
+PARAMNET_BENCHMARKS = {
+    "mnist":ParamNetMnistOnTimeBenchmark,
+    "adult":ParamNetAdultOnTimeBenchmark,
+    "letter":ParamNetLetterOnTimeBenchmark,
+    "higgs":ParamNetHiggsOnTimeBenchmark,
+    "opt_digits":ParamNetOptdigitsOnTimeBenchmark,
+}
+
 # This has been difficult to set up imports for
 def svm_benchmark():
-    return SurrogateSVMBenchmark(rng=1), "dataset_fraction", None
+    return SurrogateSVMBenchmark(rng=1), "dataset_fraction", None, None
 
+def paramnet_benchmark(task):
+    benchmark = PARAMNET_BENCHMARKS[task]
+    return benchmark(rng=1), "budget", {'batch_size_log2': 7, 'average_units_per_layer_log2': 6, "num_layers":3}, None
+
+def paramnet_mnist():
+    return paramnet_benchmark("mnist")
+
+def paramnet_adult():
+    return paramnet_benchmark("adult")
+
+def paramnet_letter():
+    return paramnet_benchmark("letter")
+
+def paramnet_opt_digits():
+    return paramnet_benchmark("opt_digits")
 
 def nn_benchmark(task):
     return (
         NNBenchmark(task_id=OPEN_ML_TASK_IDS[task], rng=1),
         "subsample",
         {"batch_size": 64, "depth": 3, "width": 128},
+        {"iter": 25},
     )
 
 
 def nn_mnist_benchmark():
     return nn_benchmark("mnist")
+
+
 nn_mnist_benchmark.log_transform_indices = [0, 1]
+
 
 def nn_fashion_mnist_benchmark():
     return nn_benchmark("fashion-mnist")
+
+
 nn_fashion_mnist_benchmark.log_transform_indices = [0, 1]
 
 
@@ -100,12 +136,77 @@ def generate_benchmark_bounds(
     return torch.tensor(bounds, **tkwargs).T
 
 
+class ObjectiveFunction:
+    def __init__(
+        self,
+        objective_function,
+        param_names,
+        config_dict,
+        fidelity_param,
+        fidelity_kwargs,
+    ) -> None:
+        self.param_names = param_names
+        self.config_dict = config_dict
+        self.fidelity_param = fidelity_param
+        self.fidelity_kwargs = fidelity_kwargs
+        self.objective_function = objective_function
+
+    def __call__(self, x, project_to_max_fidelity=False):
+        values = []
+        costs = []
+        results = []
+        for row in x:
+            if len(row.shape) == 2:
+                row = row.squeeze()
+            for k, v in zip(self.param_names, row):
+                self.config_dict[k] = v.item()
+
+            fidelity_dict = (
+                {self.fidelity_param: 1.0}
+                if project_to_max_fidelity
+                else {self.fidelity_param: row[-1].item()}
+            )
+            if self.fidelity_kwargs:
+                fidelity_dict.update(self.fidelity_kwargs)
+            res = self.objective_function(self.config_dict, fidelity_dict)
+            results.append(res)
+            # multiply by -1 since botorch maximizes by default
+            values.append(-1 * res["function_value"])
+            costs.append(res["cost"])
+        return torch.tensor(values, **tkwargs), torch.tensor(costs, **tkwargs), results
+
+
+class SyntheticObjectiveFunction:
+    def __init__(self, benchmark) -> None:
+        self.benchmark = benchmark
+        self.synthetic = True
+        self.synthetic_cost_model = AffineFidelityCostModel(
+            fidelity_weights={-1: 1.0}, fixed_cost=5.0
+        )
+
+    def __call__(self, *args, **kwargs):
+        # synthetic functions have no cost, so need to artificially create one
+        cost = self.synthetic_cost_model(*args).squeeze(1)
+        value = self.benchmark(*args)
+        return (
+            value,
+            cost,
+            [
+                {"function_value": v, "cost": c}
+                for v, c in zip(
+                    value.detach().flatten().cpu().numpy(),
+                    cost.detach().flatten().cpu().numpy(),
+                )
+            ],
+        )
+
+
 def generate_objective_function(
     benchmark: AbstractBenchmark,
     fidelity_param,
     fixed_params=None,
     fidelity_kwargs=None,
-):
+) -> ObjectiveFunction:
     if not fixed_params:
         fixed_params = {}
     param_names = list(benchmark.configuration_space)
@@ -114,29 +215,13 @@ def generate_objective_function(
 
     config_dict = fixed_params
 
-    def objective_wrapper(x, project_to_max_fidelity=False):
-        values = []
-        costs = []
-        results = []
-        for row in x:
-            if len(row.shape) == 2:
-                row = row.squeeze()
-            for k, v in zip(param_names, row):
-                config_dict[k] = v.item()
-
-            fidelity_dict = (
-                {fidelity_param: 1.0}
-                if project_to_max_fidelity
-                else {fidelity_param: row[-1].item()}
-            )
-            if fidelity_kwargs:
-                fidelity_dict.update(fidelity_kwargs)
-            res = benchmark.objective_function(config_dict, fidelity_dict)
-            results.append(res)
-            # multiply by -1 since botorch maximizes by default
-            values.append(-1 * res["function_value"])
-            costs.append(res["cost"])
-        return torch.tensor(values, **tkwargs), torch.tensor(costs, **tkwargs), results
+    objective_wrapper = ObjectiveFunction(
+        benchmark.objective_function,
+        param_names,
+        config_dict,
+        fidelity_param,
+        fidelity_kwargs,
+    )
 
     return objective_wrapper
 
@@ -147,32 +232,12 @@ def generate_optimization_task(benchmark):
     if getattr(benchmark, "synthetic", False):
         # Ensure same call signature as above
         benchmark, bounds = benchmark()
-        synthetic_cost_model = AffineFidelityCostModel(
-            fidelity_weights={-1: 1.0}, fixed_cost=5.0
-        )
-
-        def objective_function(*args, **kwargs):
-            # synthetic functions have no cost, so need to artificially create one
-            cost = synthetic_cost_model(*args).squeeze(1)
-            value = benchmark(*args)
-            return (
-                value,
-                cost,
-                [
-                    {"function_value": v, "cost": c}
-                    for v, c in zip(
-                        value.detach().flatten().cpu().numpy(),
-                        cost.detach().flatten().cpu().numpy(),
-                    )
-                ],
-            )
-
-        objective_function.synthetic = True
+        objective_function = SyntheticObjectiveFunction(benchmark)
         return objective_function, bounds
 
-    benchmark, fidelity_param, fixed_params = benchmark()
+    benchmark, fidelity_param, fixed_params, fidelity_kwargs = benchmark()
     objective_function = generate_objective_function(
-        benchmark, fidelity_param, fixed_params
+        benchmark, fidelity_param, fixed_params, fidelity_kwargs
     )
     bounds = generate_benchmark_bounds(benchmark, fidelity_param, fixed_params)
     objective_function.synthetic = False
