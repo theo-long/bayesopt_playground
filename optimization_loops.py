@@ -104,14 +104,14 @@ def optimization_loop(
 
     with gpt_settings.cholesky_max_tries(6):
         # Initialize objective model
-        mll, model = model_factory(train_x, train_obj, bounds)
+        mll, model = model_factory(train_x, train_obj, bounds, log_transform_indices=log_transform_indices)
         optimize_hyperparameters(mll)
 
         # Initialize cost model
         if isinstance(cost_model_factory, AffineFidelityCostModel):
             cost_model = cost_model_factory
         else:
-            cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds)
+            cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds, log_transform_indices=log_transform_indices)
             optimize_hyperparameters(cost_mll)
 
         for _ in trange(n_iter):
@@ -140,12 +140,12 @@ def optimization_loop(
             results += full_results
 
             # Fit models with new data
-            mll, model = model_factory(train_x, train_obj, bounds)
+            mll, model = model_factory(train_x, train_obj, bounds, log_transform_indices=log_transform_indices)
             optimize_hyperparameters(mll)
             if isinstance(cost_model_factory, AffineFidelityCostModel):
                 cost_model = cost_model_factory
             else:
-                cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds)
+                cost_mll, cost_model = cost_model_factory(train_x, train_cost, bounds, log_transform_indices=log_transform_indices)
                 optimize_hyperparameters(cost_mll)
 
 
