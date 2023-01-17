@@ -47,9 +47,9 @@ def run_experiment(
 
         if multi_fidelity:
             fidelity_samples = [
-                0.1 * bounds[-1, 1].item(),
-                0.2 * bounds[-1, 1].item(),
-                0.4 * bounds[-1, 1].item(),
+                0.1 * bounds[1, -1].item(),
+                0.2 * bounds[1, -1].item(),
+                0.4 * bounds[1, -1].item(),
             ]
         else:
             fidelity_samples = None
