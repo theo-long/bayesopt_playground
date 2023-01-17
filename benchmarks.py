@@ -144,12 +144,17 @@ class ObjectiveFunction:
         config_dict,
         fidelity_param,
         fidelity_kwargs,
+        max_fidelity,
     ) -> None:
         self.param_names = param_names
         self.config_dict = config_dict
         self.fidelity_param = fidelity_param
         self.fidelity_kwargs = fidelity_kwargs
         self.objective_function = objective_function
+        if max_fidelity > 1.0:
+          self.max_fidelity = int(max_fidelity)
+        else:
+          self.max_fidelity = max_fidelity
 
     def __call__(self, x, project_to_max_fidelity=False):
         values = []
@@ -160,11 +165,14 @@ class ObjectiveFunction:
                 row = row.squeeze()
             for k, v in zip(self.param_names, row):
                 self.config_dict[k] = v.item()
-
+    
+            fidelity_value = row[-1].item()
+            if self.max_fidelity > 1.0:
+                fidelity_value = int(fidelity_value)
             fidelity_dict = (
-                {self.fidelity_param: 1.0}
+                {self.fidelity_param: self.max_fidelity}
                 if project_to_max_fidelity
-                else {self.fidelity_param: row[-1].item()}
+                else {self.fidelity_param: fidelity_value}
             )
             if self.fidelity_kwargs:
                 fidelity_dict.update(self.fidelity_kwargs)
@@ -214,6 +222,7 @@ def generate_objective_function(
         param_names.remove(p)
 
     config_dict = fixed_params
+    max_fidelity = benchmark.fidelity_space[fidelity_param].upper
 
     objective_wrapper = ObjectiveFunction(
         benchmark.objective_function,
@@ -221,6 +230,7 @@ def generate_objective_function(
         config_dict,
         fidelity_param,
         fidelity_kwargs,
+        max_fidelity,
     )
 
     return objective_wrapper
