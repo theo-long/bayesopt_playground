@@ -178,6 +178,10 @@ def max_value_entropy_search(model, cost_model, bounds):
     candidate_set = bounds[0] + (bounds[1] - bounds[0]) * candidate_set
     return qMaxValueEntropy(model=model, candidate_set=candidate_set)
 
+def knowledge_gradient(model, cost_model, bounds):
+    return qKnowledgeGradient(model, num_fantasies=128)
+
+
 
 def expected_improvement(model, cost_model, bounds, best_f):
     return ExpectedImprovement(model=model, best_f=best_f)
