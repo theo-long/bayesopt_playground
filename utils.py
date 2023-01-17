@@ -69,7 +69,8 @@ def run_experiment(
                 results = pool.starmap(single_run, args_iterable())
         else:
             results = []
-            for args in args_iterable:
+            iterable = args_iterable()
+            for args in iterable:
                 results.append(single_run(*args))
         
         all_results += results
