@@ -1,5 +1,6 @@
 import torch
 import scipy
+import numpy as np
 
 from hpobench.benchmarks.surrogates.svm_benchmark import SurrogateSVMBenchmark
 from hpobench.benchmarks.surrogates.paramnet_benchmark import (
@@ -156,7 +157,7 @@ class ObjectiveFunction:
         else:
           self.max_fidelity = max_fidelity
 
-    def __call__(self, x, project_to_max_fidelity=False):
+    def __call__(self, x, project_to_max_fidelity=False, log_transform=False):
         values = []
         costs = []
         results = []
@@ -179,7 +180,11 @@ class ObjectiveFunction:
             res = self.objective_function(self.config_dict, fidelity_dict)
             results.append(res)
             # multiply by -1 since botorch maximizes by default
-            values.append(-1 * res["function_value"])
+            if log_transform:
+                value = -1 * np.log(res["function_value"])
+            else:
+                value = -1 * res["function_value"]
+            values.append(value)
             costs.append(res["cost"])
         return torch.tensor(values, **tkwargs), torch.tensor(costs, **tkwargs), results
 
