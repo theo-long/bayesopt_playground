@@ -103,11 +103,14 @@ def multi_fidelity_kg(model, cost_model, bounds):
         cost_model=cost_model, cost_objective=FixedCostObjective(fixed_cost=0.0)
     )
 
+    target_fidelity = bounds[1, -1].cpu().item()
+    projection_operator = ProjectionOperator(target_fidelities={-1:target_fidelity})
+
     curr_val_acqf = FixedFeatureAcquisitionFunction(
         acq_function=PosteriorMean(model),
         d=bounds.shape[-1],
         columns=[-1],
-        values=[1.0],
+        values=[target_fidelity],
     )
 
     # We need to calculate the current best value since we want to optimize the *improvement over current best* per cost
@@ -120,8 +123,7 @@ def multi_fidelity_kg(model, cost_model, bounds):
         options={"batch_limit": 10, "maxiter": 200},
     )
 
-    target_fidelity = bounds[1, -1].cpu().item()
-    projection_operator = ProjectionOperator(target_fidelities={-1:target_fidelity})
+    
     return qMultiFidelityKnowledgeGradient(
         model=model,
         num_fantasies=128 if not SMOKE_TEST else 2,
