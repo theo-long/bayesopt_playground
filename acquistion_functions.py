@@ -100,7 +100,7 @@ def optimize_acqf_and_get_observation(
 
 def multi_fidelity_kg(model, cost_model, bounds):
     cost_aware_utility = InverseCostWeightedUtility(
-        cost_model=cost_model, cost_objective=FixedCostObjective(fixed_cost=0.0)
+        cost_model=cost_model
     )
 
     target_fidelity = bounds[1, -1].cpu().item()
@@ -136,7 +136,7 @@ def mutli_fidelity_entropy_search(model, cost_model, bounds):
     """Generate multi-fidelity ES acqisition function."""
 
     cost_aware_utility = InverseCostWeightedUtility(
-        cost_model=cost_model, cost_objective=FixedCostObjective(fixed_cost=0.0)
+        cost_model=cost_model
     )
 
     candidate_set = torch.rand(
