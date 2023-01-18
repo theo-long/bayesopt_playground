@@ -1,5 +1,6 @@
 
 from botorch.models.gp_regression import SingleTaskGP
+from botorch.models.gp_regression_fidelity import SingleTaskMultiFidelityGP
 from botorch.models.transforms.outcome import Standardize
 from botorch.models.transforms.input import Normalize, Log10, ChainedInputTransform
 from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikelihood
@@ -31,7 +32,6 @@ def multi_fidelity_gp(train_x, train_obj, bounds, kernel=MaternKernel, linear_tr
         data_fidelity=-1,
         linear_truncated=linear_truncated,
         nu=5/2,
-        kernel=kernel
     )   
     mll = ExactMarginalLogLikelihood(model.likelihood, model)
     return mll, model
@@ -170,7 +170,7 @@ def _setup_custom_multifidelity_covar_module(
     return covar_module, subset_batch_dict
 
 
-class SingleTaskMultiFidelityGP(SingleTaskGP):
+class CustomSingleTaskMultiFidelityGP(SingleTaskGP):
     r"""A single task multi-fidelity GP model.
 
     A SingleTaskGP model using a DownsamplingKernel for the data fidelity
